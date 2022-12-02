@@ -29,7 +29,7 @@ estimate <- function(attractor, y0, y1, timedNnFun, sd, particleCount) {
   # meanEsti <- colSums(esti * w) / sum(w)
   
   # TODO: make bandwidth (and evtl kernel a hyperparameter) or choose adaptively
-  # TODO: kernel density like this is very memory demanding. Use KNN?
+  # TODO: needs too much memory; use KNN?
   # MAP estimate:
   dst <- as.matrix(stats::dist(esti))
   cat("d")
@@ -46,9 +46,11 @@ estimate <- function(attractor, y0, y1, timedNnFun, sd, particleCount) {
   return(map)
 }
 
-observeAndEstimate <- function(attractor, x0, x1, timedNnFun, sd, particleCount) {
+
+observeAndEstimate <- function(
+    attractor, x0, x1, timedNnFun, sd, particleCount
+) {
   
-  pt <- proc.time()
   cat("\t\t\tsample observations\n")
   # add noise to create observations
   y0 <- x0 + rnorm(3, sd=sd)
@@ -62,16 +64,15 @@ observeAndEstimate <- function(attractor, x0, x1, timedNnFun, sd, particleCount)
   estNow <- (y0 + y02) / 2
   estNowPrj <- attractor$u[attractor$nnFun(estNow)$idx, , drop=FALSE]
   
-  cat("\t\t\tduration: ", sprintf("%.1fs", (proc.time()-pt)[3]),"\n")
-  
   # return squared distance to truth
   c(wait = sum((estWaitPrj-x0)^2),
     now = sum((estNowPrj -x0)^2))
 }
 
 
-
-generateAndError <- function(attractor, deltaI, timedNnFun, sd, noiseReps, particleCount) {
+generateAndError <- function(
+    attractor, deltaI, timedNnFun, sd, noiseReps, particleCount
+) {
   
   cat("\t\tsample truth\n")
   # randomly draw the true locations of the two measurements
@@ -87,8 +88,11 @@ generateAndError <- function(attractor, deltaI, timedNnFun, sd, noiseReps, parti
   
   return(sqrErrors)
 }
+
   
-run <- function(attractor, deltaT, sd, noiseReps, locationReps, particleCount) {
+run <- function(
+    attractor, deltaT, sd, noiseReps, locationReps, particleCount
+) {
   
   deltaI <- round(deltaT / attractor$tStep)
   
@@ -109,26 +113,20 @@ run <- function(attractor, deltaT, sd, noiseReps, locationReps, particleCount) {
   return(sqrErrorss)
 }
 
-execute <- function(
-  deltaT = NULL,
-  sd = NULL,
-  noiseReps = NULL,
-  locationReps = NULL,
-  particleCount = NULL,
-  outFile = NULL,
-  attrFile = NULL
-) {
+
+execute <- function(opts) {
   
-  if (is.null(deltaT)) deltaT <- 0
-  if (is.null(sd)) sd <- 1
-  if (is.null(noiseReps)) noiseReps <- 1
-  if (is.null(locationReps)) locationReps <- 100
-  if (is.null(particleCount)) particleCount <- 1e4
-  if (is.null(outFile)) outFile <- paste0("results_", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".RDS")
-  if (is.null(attrFile)) attrFile <- "attractorLorenz63.RDS"
+  # Set default opts.
+  if (is.null(opts$deltaT)) opts$deltaT <- 0
+  if (is.null(opts$sd)) opts$sd <- 1
+  if (is.null(opts$noiseReps)) opts$noiseReps <- 1
+  if (is.null(opts$locationReps)) opts$locationReps <- 100
+  if (is.null(opts$particleCount)) opts$particleCount <- 1e4
+  if (is.null(opts$outFile)) opts$outFile <- paste0("results_", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".RDS")
+  if (is.null(opts$attrFile)) opts$attrFile <- "attractorLorenz63.RDS"
   
   cat("read attractor file\n")
-  attractor <- readRDS(attrFile)
+  attractor <- readRDS(opts$attrFile)
   
   cat("build nnFun\n")
   nnFun <- FastKNN::buildKnnFunction(
@@ -138,16 +136,20 @@ execute <- function(
   attractor$nnFun <- nnFun
   
   cat("run\n")
-  res <- run(
+  errors <- run(
     attractor, 
-    deltaT = deltaT, 
-    sd = sd, 
-    noiseReps = noiseReps, 
-    locationReps = locationReps, 
-    particleCount = particleCount)
+    deltaT = opts$deltaT, 
+    sd = opts$sd, 
+    noiseReps = opts$noiseReps, 
+    locationReps = opts$locationReps, 
+    particleCount = opts$particleCount)
   
   cat("save results\n")
-  saveRDS(res, file = outFile)
+  saveRDS(
+    list(
+      errors = errors,
+      opts = opts), 
+    file = opts$outFile)
   
   cat("clean up nnFun\n")
   FastKNN::deleteQueryFunction(nnFun)
@@ -163,11 +165,5 @@ if (length(args) > 0) {
   argList <- list()
 }
 
-execute(
-  deltaT = argList$deltaT,
-  sd = argList$sd,
-  noiseReps = argList$noiseReps,
-  locationReps = argList$locationReps,
-  particleCount = argList$particleCount,
-  outFile = argList$outFile,
-  attrFile = argList$attrFile)
+execute(argList)
+
