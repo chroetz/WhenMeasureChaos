@@ -29,6 +29,7 @@ estimate <- function(attractor, y0, y1, timedNnFun, sd, particleCount) {
   # meanEsti <- colSums(esti * w) / sum(w)
   
   # TODO: make bandwidth (and evtl kernel a hyperparameter) or choose adaptively
+  # TODO: kernel density like this is very memory demanding. Use KNN?
   # MAP estimate:
   dst <- as.matrix(stats::dist(esti))
   cat("d")
@@ -170,4 +171,3 @@ execute(
   particleCount = argList$particleCount,
   outFile = argList$outFile,
   attrFile = argList$attrFile)
-
