@@ -51,6 +51,7 @@ observeAndEstimate <- function(
     attractor, x0, x1, timedNnFun, sd, particleCount
 ) {
   
+  pt <- proc.time()
   cat("\t\t\tsample observations\n")
   # add noise to create observations
   y0 <- x0 + rnorm(3, sd=sd)
@@ -63,6 +64,8 @@ observeAndEstimate <- function(
   estWaitPrj <- attractor$u[attractor$nnFun(estWait)$idx, , drop=FALSE]
   estNow <- (y0 + y02) / 2
   estNowPrj <- attractor$u[attractor$nnFun(estNow)$idx, , drop=FALSE]
+  
+  cat("\t\t\tduration: ", sprintf("%.1fs", (proc.time()-pt)[3]),"\n")
   
   # return squared distance to truth
   c(wait = sum((estWaitPrj-x0)^2),
