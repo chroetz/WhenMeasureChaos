@@ -23,7 +23,7 @@ for (i in seq_len(nrow(grid))) {
     " --output=", jobName, "_%j.out",
     " --error=", jobName, "_%j.err",
     " --mail-type=END",
-    " --wrap=\"Rscript ", scriptName, " ", pasteRow(grid[i,]), "\"")
+    " --wrap=\"Rscript ", scriptName, " ", pasteRow(grid[i,]), " outFile=", jobName, ".RDS\"")
   cat(clcom, "\n")
   system(clcom)
 }
