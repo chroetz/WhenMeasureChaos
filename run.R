@@ -128,6 +128,9 @@ execute <- function(opts) {
   if (is.null(opts$outFile)) opts$outFile <- paste0("results_", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".RDS")
   if (is.null(opts$attrFile)) opts$attrFile <- "attractorLorenz63.RDS"
   
+  cat("Use following opts:")
+  for (i in seq_along(opts)) cat("* ", names(opts)[i], ": ", opts[[i]], "\n")
+
   cat("read attractor file\n")
   attractor <- readRDS(opts$attrFile)
   
