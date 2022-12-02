@@ -129,7 +129,8 @@ execute <- function(opts) {
   if (is.null(opts$attrFile)) opts$attrFile <- "attractorLorenz63.RDS"
   
   cat("Use following opts:")
-  for (i in seq_along(opts)) cat("* ", names(opts)[i], ": ", opts[[i]], "\n")
+  for (i in seq_along(opts)) 
+    cat("* ", names(opts)[i], ": ", opts[[i]], " (", typeof(opts[[i]]),")\n", sep="")
 
   cat("read attractor file\n")
   attractor <- readRDS(opts$attrFile)
