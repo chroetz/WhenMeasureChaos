@@ -1,0 +1,7 @@
+#%Module
+module load R/4.2.0/gcc-mkl
+module           load cmake/3.2.3
+module           load compiler/intel/15.0.3
+module           load mpi/intel/5.0.3.048
+module load pandoc/2.14.2
+module load curl/7.58.0
