@@ -1,7 +1,7 @@
 # express uncertainty in measurement of y1 by sampling "particles" around y1 with normal distri
 # a particle filter
 estimate <- function(attractor, y0, y1, timedNnFun, sd, particleCount) {
-  cat("1")
+  cat("\t\t\t\t1")
   noise <- matrix(rnorm(particleCount*3, sd=sd), nrow=particleCount)
   cat("2")
   particles <- rep(y1, each = particleCount) + noise
@@ -47,13 +47,13 @@ estimate <- function(attractor, y0, y1, timedNnFun, sd, particleCount) {
 
 observeAndEstimate <- function(attractor, x0, x1, timedNnFun, sd, particleCount) {
   
-  cat("sample observations\n")
+  cat("\t\t\tsample observations\n")
   # add noise to create observations
   y0 <- x0 + rnorm(3, sd=sd)
   y02 <- x0 + rnorm(3, sd=sd)
   y1 <- x1 + rnorm(3, sd=sd)
 
-  cat("estimate\n")
+  cat("\t\t\testimate\n")
   # estimate
   estWait <- estimate(attractor, y0, y1, timedNnFun, sd, particleCount)
   estWaitPrj <- attractor$u[attractor$nnFun(estWait)$idx, , drop=FALSE]
@@ -69,14 +69,14 @@ observeAndEstimate <- function(attractor, x0, x1, timedNnFun, sd, particleCount)
 
 generateAndError <- function(attractor, deltaI, timedNnFun, sd, noiseReps, particleCount) {
   
-  cat("sample truth\n")
+  cat("\t\tsample truth\n")
   # randomly draw the true locations of the two measurements
   i0 <- sample.int(attractor$n - deltaI, 1)
   i1 <- i0 + deltaI
   x0 <- attractor$u[i0, ]
   x1 <- attractor$u[i1, ]
   
-  cat("observeAndEstimate() with noiseReps = ", noiseReps, "\n")
+  cat("\t\tobserveAndEstimate() with noiseReps = ", noiseReps, "\n")
   sqrErrors <- replicate(
     noiseReps, 
     observeAndEstimate(attractor, x0, x1, timedNnFun, sd, particleCount))
@@ -88,18 +88,18 @@ run <- function(attractor, deltaT, sd, noiseReps, locationReps, particleCount) {
   
   deltaI <- round(deltaT / attractor$tStep)
   
-  cat("build timedNnFun\n") # TODO: do not do this twice (see nnFun)
+  cat("\tbuild timedNnFun\n") # TODO: do not do this twice (see nnFun)
   timedNnFun <- FastKNN::buildKnnFunction(
     attractor$u[(deltaI+1):attractor$n,], 
     k = 1,
     removeNaRows = FALSE)
   
-  cat("generateAndError() with locationReps = ", locationReps, "\n")
+  cat("\tgenerateAndError() with locationReps = ", locationReps, "\n")
   sqrErrorss <- replicate(
     locationReps, 
     generateAndError(attractor, deltaI, timedNnFun, sd, noiseReps, particleCount))
   
-  cat("clean up timedNnFun\n")
+  cat("\tclean up timedNnFun\n")
   FastKNN::deleteQueryFunction(timedNnFun)
   
   return(sqrErrorss)
@@ -111,7 +111,8 @@ execute <- function(
   noiseReps = NULL,
   locationReps = NULL,
   particleCount = NULL,
-  outFile = NULL
+  outFile = NULL,
+  attrFile = NULL
 ) {
   
   if (is.null(deltaT)) deltaT <- 0
@@ -120,9 +121,10 @@ execute <- function(
   if (is.null(locationReps)) locationReps <- 100
   if (is.null(particleCount)) particleCount <- 1e4
   if (is.null(outFile)) outFile <- paste0("results_", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".RDS")
+  if (is.null(attrFile)) attrFile <- "attractorLorenz63.RDS"
   
   cat("read attractor file\n")
-  attractor <- readRDS("attractorLorenz63.RDS")
+  attractor <- readRDS(attrFile)
   
   cat("build nnFun\n")
   nnFun <- FastKNN::buildKnnFunction(
@@ -163,5 +165,6 @@ execute(
   noiseReps = argList$noiseReps,
   locationReps = argList$locationReps,
   particleCount = argList$particleCount,
-  outFile = argList$outFile)
+  outFile = argList$outFile,
+  attrFile = argList$attrFile)
 
