@@ -165,8 +165,8 @@ execute <- function(opts) {
 args <- commandArgs(TRUE)
 if (length(args) > 0) {
   argMat <- matrix(unlist(strsplit(args, "=")), nrow=2)
-  numericValues <- as.numeric(argMat[2,])
-  argList <- as.list(ifelse(is.na(numericValues), argMat[2,], numericValues))
+  numericValues <- suppressWarnings(as.numeric(argMat[2,]))
+  argList <- ifelse(is.na(numericValues), as.list(argMat[2,]), as.list(numericValues))
   names(argList) <- argMat[1,]
 } else {
   argList <- list()
