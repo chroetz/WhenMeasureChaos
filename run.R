@@ -1,95 +1,54 @@
-# express uncertainty in measurement of y1 by sampling "particles" around y1 with normal distri
-# a particle filter
-estimate <- function(attractor, y0, y1, timedNnFun, sd, particleCount) {
-  cat("\t\t\t\t1")
-  noise <- matrix(rnorm(particleCount*3, sd=sd), nrow=particleCount)
-  cat("2")
-  particles <- rep(y1, each = particleCount) + noise
-  cat("3")
-  idxes <- apply(particles, 1, \(p) timedNnFun(p)$idx)
-  cat("4")
-  tabulation <- tabulate(idxes)
-  cat("5")
-  nonZero <- tabulation != 0
-  cat("6")
-  estiIdx <- which(nonZero)
-  cat("7")
-  tabWeights <- tabulation[nonZero]
-  cat("8")
-  esti <- attractor$u[estiIdx, , drop=FALSE]
-  cat("9")
-  dstEsti <- sqrt(rowSums((esti - rep(y0, each = nrow(esti)))^2))
-  cat("a")
-  y0weights <- dnorm(dstEsti, sd=sd)
-  cat("b")
-  w <- tabWeights * y0weights
-  cat("c")
-  
-  # mean estimate:
-  # meanEsti <- colSums(esti * w) / sum(w)
-  
-  # TODO: make bandwidth (and evtl kernel a hyperparameter) or choose adaptively
-  # TODO: needs too much memory; use KNN?
-  # MAP estimate:
-  dst <- as.matrix(stats::dist(esti))
-  cat("d")
-  kernel <- function(x) ifelse(x < 1, 1 - x^2, 0)
-  cat("e")
-  bandwidth <- 1
-  cat("f")
-  liklihood <- colSums(kernel(dst / bandwidth) * w)
-  cat("g")
-  map <- esti[which.max(liklihood), ]
-  
-  cat("h\n")
-  
-  return(map)
+estimate <- function(attractor, y0, y1, nnFun, sd, deltaI) {
+  i0 <- nnFun(y0)$idx
+  i1 <- i0 + deltaI
+  esti0 <- attractor$u[i0, , drop=FALSE]
+  esti1 <- attractor$u[i1, , drop=FALSE]
+  dstEsti0 <- sqrt(rowSums((esti0 - rep(y0, each = nrow(esti0)))^2))
+  dstEsti1 <- sqrt(rowSums((esti1 - rep(y1, each = nrow(esti1)))^2))
+  w0 <- dnorm(dstEsti0, sd=sd)
+  w1 <- dnorm(dstEsti1, sd=sd)
+  mapI <- i0[which.max(w0 * w1)]
+  return(c(mapI, i0[1]))
 }
 
 
 observeAndEstimate <- function(
-    attractor, x0, x1, timedNnFun, sd, particleCount
+    attractor, x0, x1, nnFun, sd, deltaI
 ) {
   
-  pt <- proc.time()
-  cat("\t\t\tsample observations\n")
+  #pt <- proc.time()
+  logg(3, "sample observations")
   # add noise to create observations
   y0 <- x0 + rnorm(3, sd=sd)
-  y02 <- x0 + rnorm(3, sd=sd)
   y1 <- x1 + rnorm(3, sd=sd)
 
-  cat("\t\t\testimate\n")
+  logg(3, "estimate")
   # estimate
-  estWait <- estimate(attractor, y0, y1, timedNnFun, sd, particleCount)
-  estWaitPrj <- attractor$u[attractor$nnFun(estWait)$idx, , drop=FALSE]
-  estNow <- (y0 + y02) / 2
-  estNowPrj <- attractor$u[attractor$nnFun(estNow)$idx, , drop=FALSE]
+  estiI <- estimate(attractor, y0, y1, nnFun, sd, deltaI)
+  #logg(3, "duration: ", sprintf("%.1fs", (proc.time()-pt)[3]))
   
-  cat("\t\t\tduration: ", sprintf("%.1fs", (proc.time()-pt)[3]),"\n")
-  
-  # return squared distance to truth
-  c(wait = sum((estWaitPrj-x0)^2),
-    now = sum((estNowPrj -x0)^2))
+  # return estimated index
+  estiI
 }
 
 
 generateAndError <- function(
-    attractor, deltaI, timedNnFun, sd, noiseReps, particleCount
+    attractor, deltaI, nnFun, sd, noiseReps
 ) {
   
-  cat("\t\tsample truth\n")
+  logg(2, "sample truth")
   # randomly draw the true locations of the two measurements
   i0 <- sample.int(attractor$n - deltaI, 1)
   i1 <- i0 + deltaI
   x0 <- attractor$u[i0, ]
   x1 <- attractor$u[i1, ]
   
-  cat("\t\tobserveAndEstimate() with noiseReps = ", noiseReps, "\n")
-  sqrErrors <- replicate(
+  logg(2, "observeAndEstimate() with noiseReps = ", noiseReps)
+  estiIs <- replicate(
     noiseReps, 
-    observeAndEstimate(attractor, x0, x1, timedNnFun, sd, particleCount))
+    observeAndEstimate(attractor, x0, x1, nnFun, sd, deltaI))
   
-  return(sqrErrors)
+  return(cbind(truth = i0, estiIs))
 }
 
   
@@ -99,21 +58,28 @@ run <- function(
   
   deltaI <- round(deltaT / attractor$tStep)
   
-  cat("\tbuild timedNnFun\n") # TODO: do not do this twice (see nnFun)
-  timedNnFun <- FastKNN::buildKnnFunction(
-    attractor$u[(deltaI+1):attractor$n,], 
-    k = 1,
+  logg(1, "build nnFun")
+  nnFun <- FastKNN::buildKnnFunction(
+    attractor$u[1:(attractor$n - deltaI), ], 
+    k = particleCount,
     removeNaRows = FALSE)
   
-  cat("\tgenerateAndError() with locationReps = ", locationReps, "\n")
-  sqrErrorss <- replicate(
+  logg(1, "generateAndError() with locationReps = ", locationReps)
+  idxes <- replicate(
     locationReps, 
-    generateAndError(attractor, deltaI, timedNnFun, sd, noiseReps, particleCount))
+    generateAndError(attractor, deltaI, nnFun, sd, noiseReps))
   
-  cat("\tclean up timedNnFun\n")
-  FastKNN::deleteQueryFunction(timedNnFun)
+  logg(1, "clean up nnFun")
+  FastKNN::deleteQueryFunction(nnFun)
   
-  return(sqrErrorss)
+  return(idxes)
+}
+
+
+logg <- function(level, ...) {
+  if (level <= -1) {
+    cat(paste0(c(rep("\t", level), ..., "\n"), collapse=""))
+  }
 }
 
 
@@ -128,22 +94,15 @@ execute <- function(opts) {
   if (is.null(opts$outFile)) opts$outFile <- paste0("results_", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".RDS")
   if (is.null(opts$attrFile)) opts$attrFile <- "attractorLorenz63.RDS"
   
-  cat("Use following opts:")
+  logg(0, "Use following opts:")
   for (i in seq_along(opts)) 
-    cat("* ", names(opts)[i], ": ", opts[[i]], " (", typeof(opts[[i]]),")\n", sep="")
+    logg(0, "* ", names(opts)[i], ": ", opts[[i]], " (", typeof(opts[[i]]),")\n", sep="")
 
-  cat("read attractor file\n")
+  logg(0, "read attractor file")
   attractor <- readRDS(opts$attrFile)
   
-  cat("build nnFun\n")
-  nnFun <- FastKNN::buildKnnFunction(
-    attractor$u, 
-    k = 1,
-    removeNaRows = FALSE)
-  attractor$nnFun <- nnFun
-  
-  cat("run\n")
-  errors <- run(
+  logg(0, "run")
+  idxes <- run(
     attractor, 
     deltaT = opts$deltaT, 
     sd = opts$sd, 
@@ -151,20 +110,28 @@ execute <- function(opts) {
     locationReps = opts$locationReps, 
     particleCount = opts$particleCount)
   
-  cat("save results\n")
+  logg(0, "save results")
+  res <- list(
+    idxes = idxes,
+    opts = opts)
   saveRDS(
-    list(
-      errors = errors,
-      opts = opts), 
+    res, 
     file = opts$outFile)
-  
-  cat("clean up nnFun\n")
-  FastKNN::deleteQueryFunction(nnFun)
+  return(res)
 }
 
 args <- commandArgs(TRUE)
+if (interactive()) {
+  args <- c(
+    "particleCount = 1e4",
+    "noiseReps = 100",
+    "locationReps = 100",
+    "sd = 0.1",
+    "deltaT = 3")
+}
+
 if (length(args) > 0) {
-  argMat <- matrix(unlist(strsplit(args, "=")), nrow=2)
+  argMat <- matrix(trimws(unlist(strsplit(args, "="))), nrow=2)
   numericValues <- suppressWarnings(as.numeric(argMat[2,]))
   argList <- ifelse(is.na(numericValues), as.list(argMat[2,]), as.list(numericValues))
   names(argList) <- argMat[1,]
@@ -172,5 +139,6 @@ if (length(args) > 0) {
   argList <- list()
 }
 
-execute(argList)
-
+pt <- proc.time()
+res <- execute(argList)
+print(proc.time() - pt)
