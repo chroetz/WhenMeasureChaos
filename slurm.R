@@ -6,11 +6,11 @@ clcom <- paste0(
   "sbatch",
   " --qos=short",
   " --ntasks=1",
-  " --cpus-per-task=4", # RAM: ~ cpus-per-task * 4 GB
+  " --cpus-per-task=1", # RAM: ~ cpus-per-task * 4 GB
   " --job-name=", jobName,
   " --output=", jobName, "_%j.out",
   " --error=", jobName, "_%j.err",
   " --mail-type=END",
-  " --wrap=\"Rscript ", scriptName, " ", paste(args, collapse=" "), "\"")
+  " --wrap=\"", paste("Rscript", scriptName, paste(args, collapse=" ")), "\"")
 cat(clcom, "\n")
 system(clcom)

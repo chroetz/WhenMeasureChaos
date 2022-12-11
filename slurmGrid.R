@@ -18,7 +18,7 @@ for (i in seq_len(nrow(grid))) {
     "sbatch",
     " --qos=short",
     " --ntasks=1",
-    " --cpus-per-task=4", # RAM: ~ cpus-per-task * 4 GB
+    " --cpus-per-task=1", # RAM: ~ cpus-per-task * 4 GB
     " --job-name=", jobName,
     " --output=", jobName, "_%j.out",
     " --error=", jobName, "_%j.err",
