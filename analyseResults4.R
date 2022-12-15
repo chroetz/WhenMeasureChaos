@@ -1,5 +1,5 @@
-files <- dir("./data3", pattern = "^WhenMeasureChaos_\\d+_.*\\.RDS")
-paths <- paste0("./data3/", files)
+files <- dir("./data4", pattern = "^WhenMeasureChaos_\\d+_.*\\.RDS")
+paths <- paste0("./data4/", files)
 
 n <- length(files)
 sds <- double(n)
@@ -8,20 +8,18 @@ deltaTs <- double(n)
 attractor <- readRDS("C:/Users/cschoetz/Documents/WhenMeasureChaos/attractorLorenz63.RDS")
 
 mses <- function(idxes) {
-  apply(idxes, 3, \(i) {
-    x0 <- attractor$u[i[1,1],]
-    esti1 <- attractor$u[i[1,-1],,drop=FALSE]
-    esti2 <- attractor$u[i[2,-1],,drop=FALSE]
-    se1 <- rowSums((rep(x0, each=nrow(esti1)) - esti1)^2)
-    se2 <- rowSums((rep(x0, each=nrow(esti2)) - esti2)^2)
-    c(mean(se1), mean(se2), sd(se1), sd(se2))})
+  apply(idxes, 2, \(i) {
+    x0 <- attractor$u[i[1],]
+    esti <- attractor$u[i[-1],,drop=FALSE]
+    se <- rowSums((rep(x0, each=nrow(esti)) - esti)^2)
+    c(mean(se), sd(se))})
 }
 
 # TODO: unclear..
 trajLenHalf <- 1e3
 projErr <- function(idxes) {
-  apply(idxes, 3, \(i) {
-    i0 <- i[1,1]
+  apply(idxes, 2, \(i) {
+    i0 <- i[1]
     x0 <- attractor$u[i0,]
     trajI <- pmin(attractor$n, pmax(1, (i0 - trajLenHalf):(i0 + trajLenHalf)))
     traj <- attractor$u[trajI, ]
@@ -39,8 +37,7 @@ projErr <- function(idxes) {
     traj <- traj[(trajLenHalf+1-llen):(trajLenHalf+1+llen),]
     trajNnFun <- FastKNN::buildKnnFunction(traj, 1)
     
-    esti1 <- attractor$u[i[1,-1],,drop=FALSE] # MAP
-    #esti2 <- attractor$u[i[2,-1],,drop=FALSE] # single
+    esti1 <- attractor$u[i[-1],,drop=FALSE] # MAP
     
     dsts <- sapply(1:nrow(esti1), \(j) {
       nn <- trajNnFun(esti1[j,])
@@ -50,21 +47,6 @@ projErr <- function(idxes) {
   })
 }
 
-ses <- function(idxes) {
-  apply(idxes, 3, \(i) {
-    x0 <- attractor$u[i[1,1],]
-    esti1 <- attractor$u[i[1,-1],,drop=FALSE]
-    esti2 <- attractor$u[i[2,-1],,drop=FALSE]
-    se1 <- rowSums((rep(x0, each=nrow(esti1)) - esti1)^2)
-    se2 <- rowSums((rep(x0, each=nrow(esti2)) - esti2)^2)
-    cbind(se1, se2)})
-}
-
-# sess <- sapply(seq_len(n), \(i) {
-#   rds <- readRDS(paths[i])
-#   ses(rds$idxes)
-#   })
-# dim(sess) <- c(100, 2, 1000, 36)
 
 msesLst <- list()
 projDstLst <- list()
@@ -85,7 +67,7 @@ geomVar <- sapply(msesLst, \(x) mean((exp(log(x[2,]/x[1,]) - mean(log(x[2,]/x[1,
 arithMean <- sapply(msesLst, \(x) mean(x[1,]))
 mmse1 <- sapply(msesLst, \(x) mean(x[2,]))
 arithVar <- sapply(msesLst, \(x) var(x[1,]))
-meanVar <- sapply(msesLst, \(x) mean(x[3,]^2))
+meanVar <- sapply(msesLst, \(x) mean(x[2,]^2))
 
 #totalVar <- apply(sess, c(2,4), \(x) var(as.vector(x)))
 totalVar <- meanVar + arithVar
@@ -105,7 +87,6 @@ data <-
     attrDst = apply(projDstArray[2,,,], 3, mean),
     timeDst = apply(projDstArray[1,,,], 3, mean)
   )
-data <- read_csv("data3.csv")
 data <- 
   data |> 
   mutate(sd = factor(sd))
