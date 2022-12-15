@@ -1,0 +1,1 @@
+ffmpeg -r 25 -f image2 -s 1536x1024 -i frame%04d.png -vcodec libx264 -crf 25  -pix_fmt yuv420p test.mp4
